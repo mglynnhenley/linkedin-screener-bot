@@ -1,7 +1,40 @@
 import { App } from '@slack/bolt';
 import dotenv from 'dotenv';
+import { parse } from 'csv-parse/sync';
+import https from 'https';
 
 dotenv.config();
+
+async function downloadFile(url, token) {
+  return new Promise((resolve, reject) => {
+    https.get(url, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => resolve(data));
+    }).on('error', reject);
+  });
+}
+
+function parseCSV(csvContent) {
+  const records = parse(csvContent, {
+    columns: true,
+    skip_empty_lines: true,
+  });
+
+  // Validate LinkedIn Profile column exists
+  if (records.length === 0 || !records[0]['LinkedIn Profile']) {
+    throw new Error('CSV must contain "LinkedIn Profile" column');
+  }
+
+  // Extract LinkedIn URLs
+  const urls = records
+    .map(row => row['LinkedIn Profile'])
+    .filter(url => url && url.trim().length > 0);
+
+  return urls;
+}
 
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
@@ -45,7 +78,16 @@ app.event('file_shared', async ({ event, client }) => {
       text: `📊 Processing ${file.name}...`,
     });
 
-    console.log('Received CSV file:', file.name);
+    // Download and parse CSV
+    const csvContent = await downloadFile(file.url_private, process.env.SLACK_BOT_TOKEN);
+    const linkedinUrls = parseCSV(csvContent);
+
+    await client.chat.postMessage({
+      channel: event.channel_id,
+      text: `Found ${linkedinUrls.length} LinkedIn profiles. Processing...`,
+    });
+
+    console.log('LinkedIn URLs:', linkedinUrls);
 
   } catch (error) {
     console.error('Error handling file:', error);
