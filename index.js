@@ -10,6 +10,11 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// C1: Validate OPENAI_API_KEY exists
+if (!process.env.OPENAI_API_KEY) {
+  throw new Error('OPENAI_API_KEY environment variable is not set');
+}
+
 async function downloadFile(url, token) {
   return new Promise((resolve, reject) => {
     https.get(url, {
@@ -121,6 +126,21 @@ async function callRelevanceAPI(profileUrls) {
 }
 
 async function rateProfile(profileData, linkedinUrl) {
+  // I1: Validate input parameters
+  if (!profileData) {
+    throw new Error('profileData is required');
+  }
+  if (!linkedinUrl || typeof linkedinUrl !== 'string') {
+    throw new Error('linkedinUrl must be a non-empty string');
+  }
+
+  // I4: Truncate profile data to avoid token limits
+  let profileDataStr = JSON.stringify(profileData, null, 2);
+  const MAX_PROFILE_LENGTH = 3000;
+  if (profileDataStr.length > MAX_PROFILE_LENGTH) {
+    profileDataStr = profileDataStr.substring(0, MAX_PROFILE_LENGTH) + '\n... [truncated]';
+  }
+
   const prompt = `You are evaluating candidates for a pre-seed VC and incubator program.
 Rate this LinkedIn profile 1-10 for founder/incubation potential.
 
@@ -133,7 +153,7 @@ Look for signals like:
 - Entrepreneurial indicators
 
 Profile data:
-${JSON.stringify(profileData, null, 2)}
+${profileDataStr}
 
 Respond with ONLY a JSON object in this exact format:
 {"rating": 8, "reasoning": "Brief explanation"}`;
@@ -144,7 +164,31 @@ Respond with ONLY a JSON object in this exact format:
     temperature: 0.3,
   });
 
-  const result = JSON.parse(response.choices[0].message.content);
+  // C3: Validate response structure before accessing
+  if (!response.choices || response.choices.length === 0) {
+    throw new Error('OpenAI API returned no choices in response');
+  }
+  if (!response.choices[0].message) {
+    throw new Error('OpenAI API response missing message in first choice');
+  }
+
+  const rawContent = response.choices[0].message.content;
+
+  // C2: Wrap JSON parsing in try-catch with validation
+  let result;
+  try {
+    result = JSON.parse(rawContent);
+  } catch (parseError) {
+    throw new Error(`Failed to parse OpenAI response as JSON: ${parseError.message}. Raw content: ${rawContent}`);
+  }
+
+  // C2: Validate parsed result has required fields
+  if (typeof result.rating !== 'number') {
+    throw new Error(`Invalid rating in OpenAI response: expected number, got ${typeof result.rating}. Raw content: ${rawContent}`);
+  }
+  if (!result.reasoning) {
+    throw new Error(`Missing reasoning in OpenAI response. Raw content: ${rawContent}`);
+  }
 
   return {
     linkedinUrl,
@@ -154,6 +198,14 @@ Respond with ONLY a JSON object in this exact format:
 }
 
 async function rateAllProfiles(enrichedProfiles, linkedinUrls) {
+  // I1: Validate input parameters
+  if (!enrichedProfiles) {
+    throw new Error('enrichedProfiles is required');
+  }
+  if (!Array.isArray(linkedinUrls)) {
+    throw new Error('linkedinUrls must be an array');
+  }
+
   const ratings = [];
 
   // Handle different possible response structures from Relevance API
@@ -161,7 +213,15 @@ async function rateAllProfiles(enrichedProfiles, linkedinUrls) {
     ? enrichedProfiles
     : enrichedProfiles.results || enrichedProfiles.data || [];
 
-  for (let i = 0; i < profiles.length; i++) {
+  // I2: Warn if array lengths don't match
+  if (profiles.length !== linkedinUrls.length) {
+    console.warn(`Warning: profiles.length (${profiles.length}) !== linkedinUrls.length (${linkedinUrls.length})`);
+  }
+
+  // I2: Use Math.min to avoid undefined access
+  const maxIndex = Math.min(profiles.length, linkedinUrls.length);
+
+  for (let i = 0; i < maxIndex; i++) {
     try {
       const rating = await rateProfile(profiles[i], linkedinUrls[i]);
       ratings.push(rating);
