@@ -1,7 +1,9 @@
 import { App } from '@slack/bolt';
 import dotenv from 'dotenv';
 import { parse } from 'csv-parse/sync';
+import { stringify } from 'csv-stringify/sync';
 import https from 'https';
+import fs from 'fs';
 import OpenAI from 'openai';
 
 dotenv.config();
@@ -240,6 +242,41 @@ async function rateAllProfiles(enrichedProfiles, linkedinUrls) {
   return ratings.sort((a, b) => b.rating - a.rating);
 }
 
+function createResultsCSV(ratings) {
+  const csv = stringify(ratings, {
+    header: true,
+    columns: [
+      { key: 'linkedinUrl', header: 'LinkedIn URL' },
+      { key: 'rating', header: 'Rating' },
+      { key: 'reasoning', header: 'Reasoning' },
+    ],
+  });
+
+  // Save to temp file
+  const filename = `results-${Date.now()}.csv`;
+  fs.writeFileSync(filename, csv);
+
+  return filename;
+}
+
+function createSummaryMessage(ratings) {
+  const topCandidates = ratings.slice(0, 5); // Top 5
+
+  let message = `✅ Processed ${ratings.length} profiles. Top candidates:\n\n`;
+
+  topCandidates.forEach((candidate, index) => {
+    message += `${index + 1}. Rating: ${candidate.rating}/10\n`;
+    message += `   ${candidate.linkedinUrl}\n`;
+    message += `   ${candidate.reasoning}\n\n`;
+  });
+
+  if (ratings.length > 5) {
+    message += `\nFull results attached below ⬇️`;
+  }
+
+  return message;
+}
+
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   appToken: process.env.SLACK_APP_TOKEN,
@@ -307,6 +344,26 @@ app.event('file_shared', async ({ event, client }) => {
     const ratings = await rateAllProfiles(enrichedProfiles, linkedinUrls);
 
     console.log('Ratings:', ratings);
+
+    // Create results CSV
+    const resultsFile = createResultsCSV(ratings);
+
+    // Send summary message
+    const summary = createSummaryMessage(ratings);
+    await client.chat.postMessage({
+      channel: event.channel_id,
+      text: summary,
+    });
+
+    // Upload results file
+    await client.files.uploadV2({
+      channel_id: event.channel_id,
+      file: fs.createReadStream(resultsFile),
+      filename: `linkedin-screening-results-${Date.now()}.csv`,
+    });
+
+    // Cleanup temp file
+    fs.unlinkSync(resultsFile);
 
   } catch (error) {
     console.error('Error handling file:', error);
