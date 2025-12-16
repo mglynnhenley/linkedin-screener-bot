@@ -55,17 +55,64 @@ function parseCSV(csvContent) {
 }
 
 async function callRelevanceAPI(profileUrls) {
-  const response = await fetch(process.env.RELEVANCE_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ profile_urls: profileUrls }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Relevance API error: ${response.statusText}`);
+  // C1: Validate environment variable exists
+  if (!process.env.RELEVANCE_API_URL) {
+    throw new Error('RELEVANCE_API_URL environment variable is not set');
   }
 
-  return await response.json();
+  // I2: Validate input is a non-empty array
+  if (!Array.isArray(profileUrls)) {
+    throw new Error('profileUrls must be an array');
+  }
+  if (profileUrls.length === 0) {
+    throw new Error('profileUrls array cannot be empty');
+  }
+
+  // I3: Set up network timeout with AbortController
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+  try {
+    const response = await fetch(process.env.RELEVANCE_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_urls: profileUrls }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      // C2: Try to get error details from response body
+      let errorMessage = `Relevance API error: HTTP ${response.status} ${response.statusText}`;
+      try {
+        const errorBody = await response.text();
+        if (errorBody) {
+          errorMessage += ` - ${errorBody}`;
+        }
+      } catch (textError) {
+        // If we can't read the error body, continue with basic error message
+      }
+      throw new Error(errorMessage);
+    }
+
+    // C2: Wrap JSON parsing in try-catch
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      throw new Error(`Failed to parse Relevance API response as JSON: ${parseError.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    // I3: Handle timeout specifically
+    if (error.name === 'AbortError') {
+      throw new Error('Relevance API request timed out after 30 seconds');
+    }
+    throw error;
+  } finally {
+    // I3: Clear timeout in finally block
+    clearTimeout(timeoutId);
+  }
 }
 
 const app = new App({
