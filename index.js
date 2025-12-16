@@ -2,8 +2,13 @@ import { App } from '@slack/bolt';
 import dotenv from 'dotenv';
 import { parse } from 'csv-parse/sync';
 import https from 'https';
+import OpenAI from 'openai';
 
 dotenv.config();
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 async function downloadFile(url, token) {
   return new Promise((resolve, reject) => {
@@ -115,6 +120,66 @@ async function callRelevanceAPI(profileUrls) {
   }
 }
 
+async function rateProfile(profileData, linkedinUrl) {
+  const prompt = `You are evaluating candidates for a pre-seed VC and incubator program.
+Rate this LinkedIn profile 1-10 for founder/incubation potential.
+
+Look for signals like:
+- Top-tier companies (FAANG, unicorns, leading startups)
+- Startup/founding experience
+- Top-tier universities (Stanford, MIT, Harvard, etc.)
+- Technical background (engineering, product, design)
+- Leadership roles
+- Entrepreneurial indicators
+
+Profile data:
+${JSON.stringify(profileData, null, 2)}
+
+Respond with ONLY a JSON object in this exact format:
+{"rating": 8, "reasoning": "Brief explanation"}`;
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4-turbo-preview',
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.3,
+  });
+
+  const result = JSON.parse(response.choices[0].message.content);
+
+  return {
+    linkedinUrl,
+    rating: result.rating,
+    reasoning: result.reasoning,
+  };
+}
+
+async function rateAllProfiles(enrichedProfiles, linkedinUrls) {
+  const ratings = [];
+
+  // Handle different possible response structures from Relevance API
+  const profiles = Array.isArray(enrichedProfiles)
+    ? enrichedProfiles
+    : enrichedProfiles.results || enrichedProfiles.data || [];
+
+  for (let i = 0; i < profiles.length; i++) {
+    try {
+      const rating = await rateProfile(profiles[i], linkedinUrls[i]);
+      ratings.push(rating);
+    } catch (error) {
+      console.error(`Error rating profile ${linkedinUrls[i]}:`, error);
+      // Skip failed profiles
+      ratings.push({
+        linkedinUrl: linkedinUrls[i],
+        rating: 0,
+        reasoning: `Error: ${error.message}`,
+      });
+    }
+  }
+
+  // Sort by rating (highest first)
+  return ratings.sort((a, b) => b.rating - a.rating);
+}
+
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   appToken: process.env.SLACK_APP_TOKEN,
@@ -177,6 +242,11 @@ app.event('file_shared', async ({ event, client }) => {
       channel: event.channel_id,
       text: '🤖 Profiles enriched. Now rating with AI...',
     });
+
+    // Rate profiles with OpenAI
+    const ratings = await rateAllProfiles(enrichedProfiles, linkedinUrls);
+
+    console.log('Ratings:', ratings);
 
   } catch (error) {
     console.error('Error handling file:', error);
