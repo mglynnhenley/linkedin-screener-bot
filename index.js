@@ -54,6 +54,20 @@ function parseCSV(csvContent) {
   return urls;
 }
 
+async function callRelevanceAPI(profileUrls) {
+  const response = await fetch(process.env.RELEVANCE_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile_urls: profileUrls }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Relevance API error: ${response.statusText}`);
+  }
+
+  return await response.json();
+}
+
 const app = new App({
   token: process.env.SLACK_BOT_TOKEN,
   appToken: process.env.SLACK_APP_TOKEN,
@@ -106,6 +120,16 @@ app.event('file_shared', async ({ event, client }) => {
     });
 
     console.log('LinkedIn URLs:', linkedinUrls);
+
+    // Enrich profiles with Relevance API
+    const enrichedProfiles = await callRelevanceAPI(linkedinUrls);
+
+    console.log('Enriched profiles:', enrichedProfiles);
+
+    await client.chat.postMessage({
+      channel: event.channel_id,
+      text: '🤖 Profiles enriched. Now rating with AI...',
+    });
 
   } catch (error) {
     console.error('Error handling file:', error);
