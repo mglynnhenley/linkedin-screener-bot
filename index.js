@@ -17,6 +17,12 @@ app.message('hello', async ({ message, say }) => {
 // File upload handler
 app.event('file_shared', async ({ event, client }) => {
   try {
+    // Validate channel_id
+    if (!event.channel_id) {
+      console.error('Missing channel_id in file_shared event:', event);
+      return;
+    }
+
     // Get file info
     const fileInfo = await client.files.info({
       file: event.file_id,
@@ -25,7 +31,7 @@ app.event('file_shared', async ({ event, client }) => {
     const file = fileInfo.file;
 
     // Only process CSV files
-    if (!file.name.endsWith('.csv')) {
+    if (!file.name.toLowerCase().endsWith('.csv')) {
       await client.chat.postMessage({
         channel: event.channel_id,
         text: '❌ Please upload a CSV file.',
