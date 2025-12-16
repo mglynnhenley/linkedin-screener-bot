@@ -243,6 +243,14 @@ async function rateAllProfiles(enrichedProfiles, linkedinUrls) {
 }
 
 function createResultsCSV(ratings) {
+  // I3: Validate ratings is non-empty array
+  if (!Array.isArray(ratings)) {
+    throw new Error('ratings must be an array');
+  }
+  if (ratings.length === 0) {
+    throw new Error('ratings array cannot be empty');
+  }
+
   const csv = stringify(ratings, {
     header: true,
     columns: [
@@ -254,12 +262,26 @@ function createResultsCSV(ratings) {
 
   // Save to temp file
   const filename = `results-${Date.now()}.csv`;
-  fs.writeFileSync(filename, csv);
+
+  // I1: Wrap fs.writeFileSync in try-catch
+  try {
+    fs.writeFileSync(filename, csv);
+  } catch (error) {
+    throw new Error(`Failed to create results CSV file: ${error.message}`);
+  }
 
   return filename;
 }
 
 function createSummaryMessage(ratings) {
+  // I3: Validate ratings is non-empty array
+  if (!Array.isArray(ratings)) {
+    throw new Error('ratings must be an array');
+  }
+  if (ratings.length === 0) {
+    throw new Error('ratings array cannot be empty');
+  }
+
   const topCandidates = ratings.slice(0, 5); // Top 5
 
   let message = `✅ Processed ${ratings.length} profiles. Top candidates:\n\n`;
@@ -348,22 +370,29 @@ app.event('file_shared', async ({ event, client }) => {
     // Create results CSV
     const resultsFile = createResultsCSV(ratings);
 
-    // Send summary message
-    const summary = createSummaryMessage(ratings);
-    await client.chat.postMessage({
-      channel: event.channel_id,
-      text: summary,
-    });
+    // I2: Wrap results sending in try-finally to ensure temp file cleanup
+    try {
+      // Send summary message
+      const summary = createSummaryMessage(ratings);
+      await client.chat.postMessage({
+        channel: event.channel_id,
+        text: summary,
+      });
 
-    // Upload results file
-    await client.files.uploadV2({
-      channel_id: event.channel_id,
-      file: fs.createReadStream(resultsFile),
-      filename: `linkedin-screening-results-${Date.now()}.csv`,
-    });
-
-    // Cleanup temp file
-    fs.unlinkSync(resultsFile);
+      // Upload results file
+      await client.files.uploadV2({
+        channel_id: event.channel_id,
+        file: fs.createReadStream(resultsFile),
+        filename: `linkedin-screening-results-${Date.now()}.csv`,
+      });
+    } finally {
+      // I2: Cleanup temp file with its own try-catch
+      try {
+        fs.unlinkSync(resultsFile);
+      } catch (unlinkError) {
+        console.error('Failed to delete temporary file:', unlinkError);
+      }
+    }
 
   } catch (error) {
     console.error('Error handling file:', error);
