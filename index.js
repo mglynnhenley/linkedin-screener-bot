@@ -10,21 +10,34 @@ async function downloadFile(url, token) {
     https.get(url, {
       headers: { 'Authorization': `Bearer ${token}` }
     }, (res) => {
+      // C1: Check HTTP status code
+      if (res.statusCode !== 200) {
+        reject(new Error(`HTTP ${res.statusCode}: Failed to download file`));
+        return;
+      }
+
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => resolve(data));
+      // C1: Handle response stream errors
+      res.on('error', reject);
     }).on('error', reject);
   });
 }
 
 function parseCSV(csvContent) {
+  // I1: Check if CSV is completely empty
+  if (!csvContent || csvContent.trim().length === 0) {
+    throw new Error('CSV file is empty');
+  }
+
   const records = parse(csvContent, {
     columns: true,
     skip_empty_lines: true,
   });
 
-  // Validate LinkedIn Profile column exists
-  if (records.length === 0 || !records[0]['LinkedIn Profile']) {
+  // I1: Validate LinkedIn Profile column exists using 'in' operator
+  if (records.length === 0 || !('LinkedIn Profile' in records[0])) {
     throw new Error('CSV must contain "LinkedIn Profile" column');
   }
 
@@ -32,6 +45,11 @@ function parseCSV(csvContent) {
   const urls = records
     .map(row => row['LinkedIn Profile'])
     .filter(url => url && url.trim().length > 0);
+
+  // I1: Check if there are no valid URLs after filtering
+  if (urls.length === 0) {
+    throw new Error('No valid LinkedIn URLs found in CSV');
+  }
 
   return urls;
 }
@@ -91,10 +109,17 @@ app.event('file_shared', async ({ event, client }) => {
 
   } catch (error) {
     console.error('Error handling file:', error);
-    await client.chat.postMessage({
-      channel: event.channel_id,
-      text: `❌ Error: ${error.message}`,
-    });
+    // I2: Check if channel_id exists before posting error message
+    if (event.channel_id) {
+      try {
+        await client.chat.postMessage({
+          channel: event.channel_id,
+          text: `❌ Error: ${error.message}`,
+        });
+      } catch (postError) {
+        console.error('Failed to post error message to Slack:', postError);
+      }
+    }
   }
 });
 
