@@ -166,81 +166,103 @@ async function rateProfile(profileData, linkedinUrl) {
   // I4: Truncate profile data to avoid token limits
   let profileDataStr = JSON.stringify(profileData, null, 2);
 
-  const system = `You are an expert talent evaluator for a pre-seed VC and incubator program.
-Your goal is to identify exceptional founder potential.
+  const system = `You are an expert talent evaluator for Merantix Capital, a pre-seed VC and incubator.
+Your goal is to identify exceptional founder potential by recognizing patterns and evaluating what makes someone interesting.
 
-Think step-by-step:
-1. What stands out about this person's background?
-2. What evidence shows they can build and ship?
-3. What suggests they're ready to start something now?
-4. What's missing or unclear?
+Stay objective: LinkedIn profiles are self-written. Trust verifiable facts (companies, titles, dates, education) over claims like "expert in" or "passionate about."
 
-Be calibrated: Use the full 1-10 scale. Most profiles are 4-6. Reserve 8+ for truly exceptional candidates.`;
+Use the full 1-10 scale. Most profiles are 4-6. Reserve 8+ for truly exceptional candidates.`;
 
   const user = `Evaluate this LinkedIn profile for founder potential (1-10 scale).
 
-## What you're looking for:
-Strong candidates typically show:
-- **Deep expertise in a domain** (e.g., 2-4+ years at quality companies building real systems/products)
-- **Evidence of building and ownership** (shipped features, led initiatives, clear impact)
-- **Signals they're ready to start** (recently left a job, open to new opportunities, clear inflection point)
-- **Quality over quantity** (depth of experience matters more than breadth)
+## Core question:
+Would this person be interesting to meet? What makes them unusual or exceptional?
 
-## Calibration guidance:
-- 9-10: Exceptional. Deep domain expertise + proven builder + clear availability. Rare.
-- 7-8: Strong. Multiple founder signals, minimal gaps.
-- 5-6: Solid but unproven. Has potential, missing key evidence.
-- 3-4: Weak. Generic background, limited ownership signals.
-- 1-2: Poor fit. No relevant signals or major red flags.
+## Look for strong patterns:
 
-## How to recognize strong signals:
+**Experience patterns:**
+- Deep tenure at quality companies (2-4+ years shows real depth)
+- Scale operators: led teams, shipped to millions, built infrastructure
+- Domain experts: deep knowledge in specific verticals (fintech, security, healthtech, etc.)
+- Big tech → startup trajectory (learned at scale, now building)
+- Early team members who rode through growth stages
 
-**Look for evidence of capability and potential:**
-- Building/shipping: Have they made things that people use?
-- Ownership: Did they lead, drive, or own outcomes?
-- Growth: Are they learning and progressing?
-- Domain knowledge: Do they understand something specific deeply?
+**Availability signals (IMPORTANT):**
+- Just left a good job (0-3 months) = EXCELLENT signal
+- Recently started in stealth (0-6 months) = STRONG signal, very available
+- Building solo 6-12 months = GOOD signal, might need co-founder/support
+- Been at same company 18+ months = NOT available for incubation (penalty)
 
-**Experience signals (important but not everything):**
-- Quality companies show they've worked at a high bar
-- Longer tenure (2+ years) at good companies suggests depth and impact
-- Recent moves or availability signals readiness to start something
-- Startup experience shows exposure to building from scratch
+**Wildcard traits (boost score):**
+- Early hustle: started business in college, built something with traction young, won competitions
+- Unconventional: art/music → tech, PhD dropout → founder, military → startup
+- Athletic: Olympic athlete, national team, D1 sports (shows discipline, peak performance)
 
-**Calibrate by career stage:**
-- Junior/recent grad (0-2 years): Bar is HIGH. Need top university OR meaningful startup experience OR exceptional early ownership
-- Mid-career (3-6 years): Should show clear progression, depth in domain, and building track record
-- Senior (7+ years): Expect deep expertise, leadership, and concrete impact
+**Education:**
+- Top universities (Stanford, MIT, Oxbridge, etc.) add credibility throughout career
+- Especially important early career
 
-**Multiple paths to strong scores:**
-- Deep technical builder with 3+ years shipping at scale
-- Domain expert who understands a vertical deeply (healthtech, fintech, sales ops, etc.)
-- Operator who's built teams/processes/GTM from 0→1
-- Recent grad from top school with early ownership signals
-- Non-traditional path but clear trajectory and hustle
+## How to evaluate evidence:
 
-**Weaker signals to note:**
-- Junior role at generic company with no standout achievements (score 3-5 range)
-- Recent grad from non-top school, no startup/building experience (score 2-4 range)
-- Long corporate/consulting background with no product-building (mild penalty)
-- Multiple "Founder" titles but no evidence of traction or learning
-- Currently founder/CEO of same company for 3+ years (not available for incubation)
+**What LinkedIn actually shows:**
+- Company names, job titles, dates (TRUST THESE - verifiable facts)
+- Team size, project scope, geographic reach (use when present)
+- Role descriptions like "rebuilt payments infrastructure" or "early team through Series B"
+- Education, certifications, languages
+- Sometimes: awards, publications, conference speaking
 
-**Education matters:**
-- Top-tier universities (Stanford, MIT, Oxbridge, etc.) provide strong signal throughout career
-- Especially important for early-career candidates
+**What LinkedIn rarely shows:**
+- Revenue, funding, retention metrics
+- Detailed traction numbers
+- Exit outcomes
+
+→ Use what's there. Don't penalize absence of metrics that wouldn't be on LinkedIn anyway.
+
+**Stay objective with self-written content:**
+- Verifiable facts (company, title, dates) > specific projects > external validation > vague claims
+- Discount generic fluff: "expert in", "passionate about", "skilled at"
+- Value specific: "Built X that did Y" shows they can articulate their work
+
+## Calibration by career stage:
+- Junior (0-2 years): HIGH bar - need top university OR startup experience OR wildcard trait
+- Mid (3-6 years): Should show progression, domain depth, building track record
+- Senior (7+ years): Expect deep expertise, leadership, proof of impact
+
+## Scoring guidance:
+- 9-10: Exceptional outlier (rare). Deep domain + proven builder + available + something unusual
+- 7-8: Strong candidate. Clear pattern match, multiple positives
+- 5-6: Solid potential but not standout yet
+- 3-4: Generic background, limited signals
+- 1-2: Poor fit or major red flags
+
+## How to write your reasoning:
+
+**Format: 2-3 sentences, focus on strengths only**
+
+Structure:
+1. What pattern do they match? (cite verifiable facts: company, role, tenure)
+2. Why are they interesting? (domain, scale, wildcards, availability)
+3. NO "what's missing" or "would be stronger if..." - just explain the score with what IS there
+
+**Good examples:**
+
+Rating 9: "Serial founder with exit (sold B2B SaaS, 4 years to acquisition). Now 3 months into stealth AI startup, previously led GTM at fast-growing SaaS company through Series C. Deep domain + proven execution + perfect timing."
+
+Rating 8: "10 years infrastructure engineering at payment/fintech companies (senior/staff level, led reliability systems). Left 2 months ago, no current role listed. Deep technical expertise in a hot domain plus clear availability."
+
+Rating 7: "Early employee at design tool startup (#8, through Series B), now founding similar company (6 months in). Former national-level athlete - strong discipline signal. Clear builder trajectory but very early stage."
+
+Rating 6: "Mid-level PM at large tech company (3 years, solid tenure) across multiple product areas. Strong university background. Good foundation but no clear domain specialization or availability signal yet."
+
+Rating 4: "Recent graduate from solid university with 1 year at consulting firm. No startup exposure, no technical building evidence, no unusual traits beyond standard internships."
 
 **Remember:**
-- Look for what's there, not just what's missing
-- Experience matters - weight it appropriately
-- Be generous when strong signals present; be honest when truly absent
-- Junior profiles need stronger credentials to score well
-
-## Step-by-step evaluation:
-1. Scan their experience: What have they built? How long did they stay?
-2. Assess domain depth: Do they understand something deeply?
-3. Check availability signals: Are they likely to start something soon?
-4. Note gaps: What's unclear or missing?
+- Cite verifiable facts (company type, role level, years)
+- Focus on patterns not brand names: "senior at fintech scale-up" > "senior at Stripe"
+- Explain what makes them interesting for incubation
+- Stay objective - it's their self-written profile
+- Don't mention gaps or missing info
+- If score is low, explain why based on what IS there (or isn't)
 
 Profile data:
 ${profileDataStr}
