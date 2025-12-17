@@ -385,7 +385,7 @@ function createResultsCSV(ratings) {
   return filename;
 }
 
-function createSummaryMessage(ratings) {
+function createSummaryMessage(ratings, duration) {
   // I3: Validate ratings is non-empty array
   if (!Array.isArray(ratings)) {
     throw new Error('ratings must be an array');
@@ -394,21 +394,14 @@ function createSummaryMessage(ratings) {
     throw new Error('ratings array cannot be empty');
   }
 
-  const topCandidates = ratings.slice(0, 5); // Top 5
+  // Format duration nicely
+  const minutes = Math.floor(duration / 60);
+  const seconds = Math.floor(duration % 60);
+  const timeStr = minutes > 0
+    ? `${minutes}m ${seconds}s`
+    : `${seconds}s`;
 
-  let message = `✅ Processed ${ratings.length} profiles. Top candidates:\n\n`;
-
-  topCandidates.forEach((candidate, index) => {
-    message += `${index + 1}. Rating: ${candidate.rating}/10\n`;
-    message += `   ${candidate.linkedinUrl}\n`;
-    message += `   ${candidate.reasoning}\n\n`;
-  });
-
-  if (ratings.length > 5) {
-    message += `\nFull results attached below ⬇️`;
-  }
-
-  return message;
+  return `✅ **Complete!** Processed ${ratings.length} profiles in ${timeStr}. Results attached.`;
 }
 
 const app = new App({
@@ -461,26 +454,29 @@ app.event('file_shared', async ({ event, client }) => {
       return;
     }
 
-    // Send acknowledgment
-    await client.chat.postMessage({
-      channel: event.channel_id,
-      thread_ts: thread_ts,
-      text: `📊 Processing ${file.name}...`,
-    });
+    // Track start time
+    const startTime = Date.now();
 
     // Download and parse CSV (includes validation and dedup)
     const csvContent = await downloadFile(file.url_private, process.env.SLACK_BOT_TOKEN);
     const linkedinUrls = parseCSV(csvContent);
 
+    // Send acknowledgment with profile count
     await client.chat.postMessage({
       channel: event.channel_id,
       thread_ts: thread_ts,
-      text: `Found ${linkedinUrls.length} LinkedIn profiles. Processing...`,
+      text: `📊 **Processing \`${file.name}\`** - Found ${linkedinUrls.length} LinkedIn profiles`,
     });
 
     console.log('LinkedIn URLs:', linkedinUrls);
 
     // Enrich profiles with Relevance API
+    await client.chat.postMessage({
+      channel: event.channel_id,
+      thread_ts: thread_ts,
+      text: `🌐 **Enriching profiles...** (may take 1-2 minutes for large lists)`,
+    });
+
     const enrichedProfiles = await callRelevanceAPI(linkedinUrls);
 
     console.log("ENRICHED PROFILES: ", enrichedProfiles);
@@ -499,7 +495,7 @@ app.event('file_shared', async ({ event, client }) => {
     await client.chat.postMessage({
       channel: event.channel_id,
       thread_ts: thread_ts,
-      text: '🤖 Profiles enriched. Now rating with AI...',
+      text: '🤖 **Rating profiles with AI...**',
     });
 
     // Rate profiles with OpenAI
@@ -507,13 +503,19 @@ app.event('file_shared', async ({ event, client }) => {
 
     console.log('Ratings:', ratings);
 
+    // Calculate duration
+    const duration = (Date.now() - startTime) / 1000; // in seconds
+
     // Create results CSV
     const resultsFile = createResultsCSV(ratings);
+
+    // Create output filename: attendees-screened-{originalname}.csv
+    const outputFilename = `attendees-screened-${file.name}`;
 
     // I2: Wrap results sending in try-finally to ensure temp file cleanup
     try {
       // Send summary message
-      const summary = createSummaryMessage(ratings);
+      const summary = createSummaryMessage(ratings, duration);
       await client.chat.postMessage({
         channel: event.channel_id,
         thread_ts: thread_ts,
@@ -525,7 +527,7 @@ app.event('file_shared', async ({ event, client }) => {
         channel_id: event.channel_id,
         thread_ts: thread_ts,
         file: fs.createReadStream(resultsFile),
-        filename: `linkedin-screening-results-${Date.now()}.csv`,
+        filename: outputFilename,
       });
     } finally {
       // I2: Cleanup temp file with its own try-catch
