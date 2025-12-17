@@ -12,6 +12,8 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const RATING_BATCH_SIZE = 30;
+
 // C1: Validate OPENAI_API_KEY exists
 if (!process.env.OPENAI_API_KEY) {
   throw new Error('OPENAI_API_KEY environment variable is not set');
@@ -48,83 +50,108 @@ function parseCSV(csvContent) {
     skip_empty_lines: true,
   });
 
-  // I1: Validate LinkedIn Profile column exists using 'in' operator
-  if (records.length === 0 || !('LinkedIn Profile' in records[0])) {
-    throw new Error('CSV must contain "LinkedIn Profile" column');
+  if (records.length === 0) {
+    throw new Error('CSV file contains no data rows');
   }
 
-  // Extract LinkedIn URLs
-  const urls = records
-    .map(row => row['LinkedIn Profile'])
-    .filter(url => url && url.trim().length > 0);
+  // Auto-detect column containing LinkedIn URLs
+  const headers = Object.keys(records[0]);
+  let linkedinColumn = null;
 
-  // I1: Check if there are no valid URLs after filtering
+  for (const header of headers) {
+    // Check if any row in this column contains "linkedin.com"
+    const hasLinkedInUrl = records.some(row => {
+      const value = (row[header] || '').toString().toLowerCase();
+      return value.includes('linkedin.com');
+    });
+
+    if (hasLinkedInUrl) {
+      linkedinColumn = header;
+      console.log(`[TRACE] Auto-detected LinkedIn column: "${linkedinColumn}"`);
+      break;
+    }
+  }
+
+  if (!linkedinColumn) {
+    throw new Error('No column containing LinkedIn URLs found. Please ensure your CSV has LinkedIn profile links.');
+  }
+
+  const seen = new Set();
+
+  const urls = records
+    .map(row => (row[linkedinColumn] || '').trim())
+    .filter(url => url.length > 0)
+    .filter(url => {
+      if (seen.has(url)) return false;
+      seen.add(url);
+      return true;
+    });
+
   if (urls.length === 0) {
-    throw new Error('No valid LinkedIn URLs found in CSV');
+    throw new Error('No LinkedIn URLs found in CSV after dedup');
   }
 
   return urls;
 }
 
+function chunkArray(items, size) {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+}
+
 async function callRelevanceAPI(profileUrls) {
-  // C1: Validate environment variable exists
+  console.log(`[TRACE] Relevance API: sending ${profileUrls.length} profile URLs`);
   if (!process.env.RELEVANCE_API_URL) {
     throw new Error('RELEVANCE_API_URL environment variable is not set');
   }
-
-  // I2: Validate input is a non-empty array
-  if (!Array.isArray(profileUrls)) {
-    throw new Error('profileUrls must be an array');
-  }
-  if (profileUrls.length === 0) {
-    throw new Error('profileUrls array cannot be empty');
+  if (!Array.isArray(profileUrls) || profileUrls.length === 0) {
+    throw new Error('profileUrls must be a non-empty array');
   }
 
-  // I3: Set up network timeout with AbortController
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+  const batches = chunkArray(profileUrls, 50);
+  const combinedProfiles = [];
 
-  try {
+  for (let idx = 0; idx < batches.length; idx++) {
+    const batch = batches[idx];
+    const batchLabel = `${idx + 1}/${batches.length}`;
+    console.log(`[TRACE] Relevance API batch ${batchLabel}: sending ${batch.length}`);
+
     const response = await fetch(process.env.RELEVANCE_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ profile_urls: profileUrls }),
-      signal: controller.signal,
+      body: JSON.stringify({ profile_urls: batch }),
     });
 
+    console.log(`[TRACE] Relevance API batch ${batchLabel}: response ${response.status} ${response.statusText}`);
+
     if (!response.ok) {
-      // C2: Try to get error details from response body
-      let errorMessage = `Relevance API error: HTTP ${response.status} ${response.statusText}`;
-      try {
-        const errorBody = await response.text();
-        if (errorBody) {
-          errorMessage += ` - ${errorBody}`;
-        }
-      } catch (textError) {
-        // If we can't read the error body, continue with basic error message
-      }
-      throw new Error(errorMessage);
+      const errorBody = await response.text().catch(() => '');
+      const extra = errorBody ? ` - ${errorBody}` : '';
+      throw new Error(`Relevance API error (batch ${batchLabel}): HTTP ${response.status} ${response.statusText}${extra}`);
     }
 
-    // C2: Wrap JSON parsing in try-catch
     let data;
     try {
       data = await response.json();
     } catch (parseError) {
-      throw new Error(`Failed to parse Relevance API response as JSON: ${parseError.message}`);
+      throw new Error(`Failed to parse Relevance API response (batch ${batchLabel}) as JSON: ${parseError.message}`);
     }
 
-    return data;
-  } catch (error) {
-    // I3: Handle timeout specifically
-    if (error.name === 'AbortError') {
-      throw new Error('Relevance API request timed out after 30 seconds');
-    }
-    throw error;
-  } finally {
-    // I3: Clear timeout in finally block
-    clearTimeout(timeoutId);
+    const batchProfiles = Array.isArray(data?.profiles)
+      ? data.profiles
+      : Array.isArray(data)
+        ? data
+        : [];
+
+    console.log(`[TRACE] Relevance API batch ${batchLabel}: profiles returned ${batchProfiles.length}`);
+    combinedProfiles.push(...batchProfiles);
   }
+
+  console.log(`[TRACE] Relevance API combined profiles: ${combinedProfiles.length}`);
+  return { profiles: combinedProfiles };
 }
 
 async function rateProfile(profileData, linkedinUrl) {
@@ -138,45 +165,121 @@ async function rateProfile(profileData, linkedinUrl) {
 
   // I4: Truncate profile data to avoid token limits
   let profileDataStr = JSON.stringify(profileData, null, 2);
-  const MAX_PROFILE_LENGTH = 3000;
-  if (profileDataStr.length > MAX_PROFILE_LENGTH) {
-    profileDataStr = profileDataStr.substring(0, MAX_PROFILE_LENGTH) + '\n... [truncated]';
-  }
 
-  const prompt = `You are evaluating candidates for a pre-seed VC and incubator program.
-Rate this LinkedIn profile 1-10 for founder/incubation potential.
+  const system = `You are an expert talent evaluator for a pre-seed VC and incubator program.
+Your goal is to identify exceptional founder potential.
 
-Look for signals like:
-- Top-tier companies (FAANG, unicorns, leading startups)
-- Startup/founding experience
-- Top-tier universities (Stanford, MIT, Harvard, etc.)
-- Technical background (engineering, product, design)
-- Leadership roles
-- Entrepreneurial indicators
+Think step-by-step:
+1. What stands out about this person's background?
+2. What evidence shows they can build and ship?
+3. What suggests they're ready to start something now?
+4. What's missing or unclear?
+
+Be calibrated: Use the full 1-10 scale. Most profiles are 4-6. Reserve 8+ for truly exceptional candidates.`;
+
+  const user = `Evaluate this LinkedIn profile for founder potential (1-10 scale).
+
+## What you're looking for:
+Strong candidates typically show:
+- **Deep expertise in a domain** (e.g., 2-4+ years at quality companies building real systems/products)
+- **Evidence of building and ownership** (shipped features, led initiatives, clear impact)
+- **Signals they're ready to start** (recently left a job, open to new opportunities, clear inflection point)
+- **Quality over quantity** (depth of experience matters more than breadth)
+
+## Calibration guidance:
+- 9-10: Exceptional. Deep domain expertise + proven builder + clear availability. Rare.
+- 7-8: Strong. Multiple founder signals, minimal gaps.
+- 5-6: Solid but unproven. Has potential, missing key evidence.
+- 3-4: Weak. Generic background, limited ownership signals.
+- 1-2: Poor fit. No relevant signals or major red flags.
+
+## How to recognize strong signals:
+
+**Look for evidence of capability and potential:**
+- Building/shipping: Have they made things that people use?
+- Ownership: Did they lead, drive, or own outcomes?
+- Growth: Are they learning and progressing?
+- Domain knowledge: Do they understand something specific deeply?
+
+**Experience signals (important but not everything):**
+- Quality companies show they've worked at a high bar
+- Longer tenure (2+ years) at good companies suggests depth and impact
+- Recent moves or availability signals readiness to start something
+- Startup experience shows exposure to building from scratch
+
+**Calibrate by career stage:**
+- Junior/recent grad (0-2 years): Bar is HIGH. Need top university OR meaningful startup experience OR exceptional early ownership
+- Mid-career (3-6 years): Should show clear progression, depth in domain, and building track record
+- Senior (7+ years): Expect deep expertise, leadership, and concrete impact
+
+**Multiple paths to strong scores:**
+- Deep technical builder with 3+ years shipping at scale
+- Domain expert who understands a vertical deeply (healthtech, fintech, sales ops, etc.)
+- Operator who's built teams/processes/GTM from 0→1
+- Recent grad from top school with early ownership signals
+- Non-traditional path but clear trajectory and hustle
+
+**Weaker signals to note:**
+- Junior role at generic company with no standout achievements (score 3-5 range)
+- Recent grad from non-top school, no startup/building experience (score 2-4 range)
+- Long corporate/consulting background with no product-building (mild penalty)
+- Multiple "Founder" titles but no evidence of traction or learning
+- Currently founder/CEO of same company for 3+ years (not available for incubation)
+
+**Education matters:**
+- Top-tier universities (Stanford, MIT, Oxbridge, etc.) provide strong signal throughout career
+- Especially important for early-career candidates
+
+**Remember:**
+- Look for what's there, not just what's missing
+- Experience matters - weight it appropriately
+- Be generous when strong signals present; be honest when truly absent
+- Junior profiles need stronger credentials to score well
+
+## Step-by-step evaluation:
+1. Scan their experience: What have they built? How long did they stay?
+2. Assess domain depth: Do they understand something deeply?
+3. Check availability signals: Are they likely to start something soon?
+4. Note gaps: What's unclear or missing?
 
 Profile data:
 ${profileDataStr}
 
-Respond with ONLY a JSON object in this exact format:
-{"rating": 8, "reasoning": "Brief explanation"}`;
-
+Return JSON with:
+- rating: integer 1-10
+- reasoning: 2-3 sentences explaining your score. Cite specific evidence.`;
+  
   const response = await openai.chat.completions.create({
-    model: 'gpt-4-turbo-preview',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.3,
+    model: "gpt-5.2",
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    temperature: 0.2,
+    response_format: {
+      type: "json_schema",
+      json_schema: {
+        name: "rating_response",
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            rating: { type: "integer", minimum: 1, maximum: 10 },
+            reasoning: { type: "string", maxLength: 800 }
+          },
+          required: ["rating", "reasoning"]
+        },
+        strict: true
+      }
+    }
   });
 
-  // C3: Validate response structure before accessing
-  if (!response.choices || response.choices.length === 0) {
-    throw new Error('OpenAI API returned no choices in response');
-  }
-  if (!response.choices[0].message) {
-    throw new Error('OpenAI API response missing message in first choice');
+  // Extract structured JSON directly
+  const rawContent = response?.choices?.[0]?.message?.content;
+  if (!rawContent) {
+    throw new Error('OpenAI API returned an empty response.');
   }
 
-  const rawContent = response.choices[0].message.content;
-
-  // C2: Wrap JSON parsing in try-catch with validation
   let result;
   try {
     result = JSON.parse(rawContent);
@@ -184,12 +287,9 @@ Respond with ONLY a JSON object in this exact format:
     throw new Error(`Failed to parse OpenAI response as JSON: ${parseError.message}. Raw content: ${rawContent}`);
   }
 
-  // C2: Validate parsed result has required fields
-  if (typeof result.rating !== 'number') {
-    throw new Error(`Invalid rating in OpenAI response: expected number, got ${typeof result.rating}. Raw content: ${rawContent}`);
-  }
-  if (!result.reasoning) {
-    throw new Error(`Missing reasoning in OpenAI response. Raw content: ${rawContent}`);
+  // Minimal sanity check
+  if (typeof result.rating !== 'number' || typeof result.reasoning !== 'string') {
+    throw new Error(`OpenAI response missing required fields. Raw content: ${rawContent}`);
   }
 
   return {
@@ -210,10 +310,14 @@ async function rateAllProfiles(enrichedProfiles, linkedinUrls) {
 
   const ratings = [];
 
-  // Handle different possible response structures from Relevance API
-  const profiles = Array.isArray(enrichedProfiles)
-    ? enrichedProfiles
-    : enrichedProfiles.results || enrichedProfiles.data || [];
+  // Ensure we always have an array of profiles (API returns under `profiles`)
+  const profiles = Array.isArray(enrichedProfiles?.profiles)
+    ? enrichedProfiles.profiles
+    : Array.isArray(enrichedProfiles)
+      ? enrichedProfiles
+      : [];
+
+  console.log(`[TRACE] Enriched profiles received: ${profiles.length}, input URLs: ${linkedinUrls.length}`);
 
   // I2: Warn if array lengths don't match
   if (profiles.length !== linkedinUrls.length) {
@@ -222,24 +326,32 @@ async function rateAllProfiles(enrichedProfiles, linkedinUrls) {
 
   // I2: Use Math.min to avoid undefined access
   const maxIndex = Math.min(profiles.length, linkedinUrls.length);
+  const indexBatches = chunkArray([...Array(maxIndex).keys()], RATING_BATCH_SIZE);
 
-  for (let i = 0; i < maxIndex; i++) {
-    try {
-      const rating = await rateProfile(profiles[i], linkedinUrls[i]);
-      ratings.push(rating);
-    } catch (error) {
-      console.error(`Error rating profile ${linkedinUrls[i]}:`, error);
-      // Skip failed profiles
-      ratings.push({
-        linkedinUrl: linkedinUrls[i],
-        rating: 0,
-        reasoning: `Error: ${error.message}`,
-      });
+  for (let b = 0; b < indexBatches.length; b++) {
+    const batch = indexBatches[b];
+    console.log(`[TRACE] Rating batch ${b + 1}/${indexBatches.length}: size=${batch.length}`);
+
+    for (const idx of batch) {
+      const url = linkedinUrls[idx];
+      const profile = profiles[idx];
+      try {
+        const rating = await rateProfile(profile, url);
+        ratings.push(rating);
+      } catch (error) {
+        console.error(`Error rating profile ${url}:`, error);
+        ratings.push({
+          linkedinUrl: url,
+          rating: 0,
+          reasoning: `Error: ${error.message}`,
+        });
+      }
     }
   }
 
-  // Sort by rating (highest first)
-  return ratings.sort((a, b) => b.rating - a.rating);
+  const sorted = ratings.sort((a, b) => b.rating - a.rating);
+  console.log(`[TRACE] Ratings produced: ${sorted.length}`);
+  return sorted;
 }
 
 function createResultsCSV(ratings) {
@@ -326,10 +438,24 @@ app.event('file_shared', async ({ event, client }) => {
 
     const file = fileInfo.file;
 
+    // Get bot's user ID and skip if file was uploaded by the bot itself
+    const authResult = await client.auth.test();
+    if (file.user === authResult.user_id) {
+      console.log('[TRACE] Skipping file uploaded by bot itself');
+      return;
+    }
+
+    // Get the message timestamp for threading
+    // The file shares contain the message ts where the file was shared
+    const shares = file.shares?.private || file.shares?.public || {};
+    const channelShares = shares[event.channel_id] || [];
+    const thread_ts = channelShares[0]?.ts || null;
+
     // Only process CSV files
     if (!file.name.toLowerCase().endsWith('.csv')) {
       await client.chat.postMessage({
         channel: event.channel_id,
+        thread_ts: thread_ts,
         text: '❌ Please upload a CSV file.',
       });
       return;
@@ -338,15 +464,17 @@ app.event('file_shared', async ({ event, client }) => {
     // Send acknowledgment
     await client.chat.postMessage({
       channel: event.channel_id,
+      thread_ts: thread_ts,
       text: `📊 Processing ${file.name}...`,
     });
 
-    // Download and parse CSV
+    // Download and parse CSV (includes validation and dedup)
     const csvContent = await downloadFile(file.url_private, process.env.SLACK_BOT_TOKEN);
     const linkedinUrls = parseCSV(csvContent);
 
     await client.chat.postMessage({
       channel: event.channel_id,
+      thread_ts: thread_ts,
       text: `Found ${linkedinUrls.length} LinkedIn profiles. Processing...`,
     });
 
@@ -355,10 +483,22 @@ app.event('file_shared', async ({ event, client }) => {
     // Enrich profiles with Relevance API
     const enrichedProfiles = await callRelevanceAPI(linkedinUrls);
 
-    console.log('Enriched profiles:', enrichedProfiles);
+    console.log("ENRICHED PROFILES: ", enrichedProfiles);
+
+    // Ensure we have profiles before proceeding
+    const profiles = Array.isArray(enrichedProfiles?.profiles)
+      ? enrichedProfiles.profiles
+      : Array.isArray(enrichedProfiles)
+        ? enrichedProfiles
+        : [];
+
+    if (profiles.length === 0) {
+      throw new Error('Relevance API returned no profiles; aborting.');
+    }
 
     await client.chat.postMessage({
       channel: event.channel_id,
+      thread_ts: thread_ts,
       text: '🤖 Profiles enriched. Now rating with AI...',
     });
 
@@ -376,12 +516,14 @@ app.event('file_shared', async ({ event, client }) => {
       const summary = createSummaryMessage(ratings);
       await client.chat.postMessage({
         channel: event.channel_id,
+        thread_ts: thread_ts,
         text: summary,
       });
 
       // Upload results file
       await client.files.uploadV2({
         channel_id: event.channel_id,
+        thread_ts: thread_ts,
         file: fs.createReadStream(resultsFile),
         filename: `linkedin-screening-results-${Date.now()}.csv`,
       });
@@ -399,8 +541,11 @@ app.event('file_shared', async ({ event, client }) => {
     // I2: Check if channel_id exists before posting error message
     if (event.channel_id) {
       try {
+        // Try to get thread_ts if available in scope
+        const errorThreadTs = typeof thread_ts !== 'undefined' ? thread_ts : null;
         await client.chat.postMessage({
           channel: event.channel_id,
+          thread_ts: errorThreadTs,
           text: `❌ Error: ${error.message}`,
         });
       } catch (postError) {
