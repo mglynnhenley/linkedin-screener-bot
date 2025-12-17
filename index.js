@@ -401,7 +401,7 @@ function createSummaryMessage(ratings, duration) {
     ? `${minutes}m ${seconds}s`
     : `${seconds}s`;
 
-  return `✅ **Complete!** Processed ${ratings.length} profiles in ${timeStr}. Results attached.`;
+  return `✅ *Complete!* Processed ${ratings.length} profiles in ${timeStr}. Results attached.`;
 }
 
 const app = new App({
@@ -465,7 +465,7 @@ app.event('file_shared', async ({ event, client }) => {
     await client.chat.postMessage({
       channel: event.channel_id,
       thread_ts: thread_ts,
-      text: `📊 **Processing \`${file.name}\`** - Found ${linkedinUrls.length} LinkedIn profiles`,
+      text: `📊 *Processing \`${file.name}\`* - Found ${linkedinUrls.length} LinkedIn profiles`,
     });
 
     console.log('LinkedIn URLs:', linkedinUrls);
@@ -474,7 +474,7 @@ app.event('file_shared', async ({ event, client }) => {
     await client.chat.postMessage({
       channel: event.channel_id,
       thread_ts: thread_ts,
-      text: `🌐 **Enriching profiles...** (may take 1-2 minutes for large lists)`,
+      text: `🌐 *Enriching profiles...* (may take 1-2 minutes for large lists)`,
     });
 
     const enrichedProfiles = await callRelevanceAPI(linkedinUrls);
@@ -495,7 +495,7 @@ app.event('file_shared', async ({ event, client }) => {
     await client.chat.postMessage({
       channel: event.channel_id,
       thread_ts: thread_ts,
-      text: '🤖 **Rating profiles with AI...**',
+      text: '🤖 *Rating profiles with AI...*',
     });
 
     // Rate profiles with OpenAI
