@@ -234,9 +234,9 @@ Would this person be interesting to meet? What makes them unusual or exceptional
 - 10: Dream candidate. Deep domain expert + clear builder + available now + wildcard trait. Would be excited to meet immediately.
 - 9: Exceptional. Strong on most dimensions, one standout quality. Clear "yes, let's talk."
 - 8: Very strong. Multiple positives, would definitely take a meeting.
-- 7: Good candidate. Clear strengths in 1-2 areas, worth exploring.
-- 6: Interesting but needs more. One good signal but rest is unclear or generic.
-- 5: Okay foundation. Decent background but nothing that stands out yet. Maybe in a few years.
+- 7: Good candidate. Clear strengths in 1-2 areas, worth exploring (avoid giving a 6 if there is a clear 8 or 9)
+- 6: Interesting but needs more. One good signal but rest is unclear or generic (avoid giving a 6 if there is a clear 7 or 8 or a clear arguement for lower)
+- 5: Okay foundation. Decent background but nothing that stands out yet. Maybe in a few years. (avoid giving a 5 if there is a clear arguement for 4)
 - 4: Weak signals. Generic background, limited building evidence. Junior at average company, no wildcards.
 - 3: Poor fit. Wrong profile for early-stage founding. Long corporate career, no ownership, or very early with no signals.
 - 2: Red flags. Currently unavailable (long-term CEO), no relevant experience, or concerning patterns.
