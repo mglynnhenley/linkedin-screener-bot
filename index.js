@@ -180,13 +180,13 @@ Would this person be interesting to meet? What makes them unusual or exceptional
 
 ## Look for strong patterns:
 
-**Experience patterns:**
+**Experience patterns (technical OR non-technical):**
 - Deep tenure at quality companies (2-4+ years shows real depth)
-- Scale operators: led teams, shipped to millions, built infrastructure
-- Domain experts: deep knowledge in specific verticals (fintech, security, healthtech, etc.)
+- Scale operators: led teams, shipped to millions, built infrastructure or GTM/sales motion
+- Domain experts: deep knowledge in specific verticals (fintech, security, healthtech, sales ops, etc.)
 - Big tech → startup trajectory (learned at scale, now building)
 - Early team members who rode through growth stages
-- Non-technical founding paths: Founding Associate, Chief of Staff, first hire (sales/ops/GTM) at top university + startup
+- Strong non-technical paths: Founding Associate, Chief of Staff, first hire (sales/ops/GTM) at startup - equally valuable if strong startup experience
 
 **Availability signals (IMPORTANT):**
 - Just left a good job (0-3 months) = EXCELLENT signal
@@ -277,9 +277,10 @@ Rating 3: "15 years in corporate IT roles, no product building. Wrong profile fo
 
 Rating 2: "Currently CEO of same company for 4 years. Not available for incubation."
 
-Rating 1: "Pure sales background with no product/technical exposure, no top university, no startup experience. Not relevant for technical founding."
+Rating 1: "Enterprise sales at large corporations (10 years), no startup exposure, no product/GTM building, no top university. Not relevant for early-stage founding."
 
 **Remember:**
+- Technical and non-technical are EQUALLY valuable if startup experience is strong
 - Cite verifiable facts (company type, role level, years)
 - Focus on patterns not brand names: "senior at fintech scale-up" > "senior at Stripe"
 - Explain what makes them interesting for incubation
