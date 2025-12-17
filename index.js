@@ -186,6 +186,7 @@ Would this person be interesting to meet? What makes them unusual or exceptional
 - Domain experts: deep knowledge in specific verticals (fintech, security, healthtech, etc.)
 - Big tech → startup trajectory (learned at scale, now building)
 - Early team members who rode through growth stages
+- Non-technical founding paths: Founding Associate, Chief of Staff, first hire (sales/ops/GTM) at top university + startup
 
 **Availability signals (IMPORTANT):**
 - Just left a good job (0-3 months) = EXCELLENT signal
@@ -228,12 +229,20 @@ Would this person be interesting to meet? What makes them unusual or exceptional
 - Mid (3-6 years): Should show progression, domain depth, building track record
 - Senior (7+ years): Expect deep expertise, leadership, proof of impact
 
-## Scoring guidance:
-- 9-10: Exceptional outlier (rare). Deep domain + proven builder + available + something unusual
-- 7-8: Strong candidate. Clear pattern match, multiple positives
-- 5-6: Solid potential but not standout yet
-- 3-4: Generic background, limited signals
-- 1-2: Poor fit or major red flags
+## Scoring guidance - USE THE FULL RANGE:
+
+- 10: Dream candidate. Deep domain expert + clear builder + available now + wildcard trait. Would be excited to meet immediately.
+- 9: Exceptional. Strong on most dimensions, one standout quality. Clear "yes, let's talk."
+- 8: Very strong. Multiple positives, would definitely take a meeting.
+- 7: Good candidate. Clear strengths in 1-2 areas, worth exploring.
+- 6: Interesting but needs more. One good signal but rest is unclear or generic.
+- 5: Okay foundation. Decent background but nothing that stands out yet. Maybe in a few years.
+- 4: Weak signals. Generic background, limited building evidence. Junior at average company, no wildcards.
+- 3: Poor fit. Wrong profile for early-stage founding. Long corporate career, no ownership, or very early with no signals.
+- 2: Red flags. Currently unavailable (long-term CEO), no relevant experience, or concerning patterns.
+- 1: Not relevant. Completely wrong profile (sales-only with no product exposure, pure academic, etc.)
+
+**Be bold with scores:** Don't cluster in 5-7. If someone is interesting, give them 8+. If they're generic, give them 3-4.
 
 ## How to write your reasoning:
 
@@ -246,15 +255,29 @@ Structure:
 
 **Good examples:**
 
-Rating 9: "Serial founder with exit (sold B2B SaaS, 4 years to acquisition). Now 3 months into stealth AI startup, previously led GTM at fast-growing SaaS company through Series C. Deep domain + proven execution + perfect timing."
+Rating 10: "8 years building ML infrastructure at scale-ups, led 15-person team through Series B→C, left 2 months ago. Former Olympic swimmer. Now in stealth AI infra startup (4 months). Deep technical + proven leadership + wildcard + perfect timing."
 
-Rating 8: "10 years infrastructure engineering at payment/fintech companies (senior/staff level, led reliability systems). Left 2 months ago, no current role listed. Deep technical expertise in a hot domain plus clear availability."
+Rating 9: "Serial founder with exit (sold B2B SaaS after 4 years). Now 3 months into stealth AI startup, previously led GTM at SaaS company through Series C. Proven execution in hot domain."
 
-Rating 7: "Early employee at design tool startup (#8, through Series B), now founding similar company (6 months in). Former national-level athlete - strong discipline signal. Clear builder trajectory but very early stage."
+Rating 8: "10 years infrastructure eng at payment companies (senior level, led reliability at scale). Left 2 months ago, no current role. Deep fintech expertise plus clear availability."
 
-Rating 6: "Mid-level PM at large tech company (3 years, solid tenure) across multiple product areas. Strong university background. Good foundation but no clear domain specialization or availability signal yet."
+Rating 8: "Founding Associate at top-tier VC-backed startup (3 years, pre-seed→Series A), then Chief of Staff at scale-up. Oxford grad. Left 1 month ago. Saw 0→1 up close, strong university, clear availability."
 
-Rating 4: "Recent graduate from solid university with 1 year at consulting firm. No startup exposure, no technical building evidence, no unusual traits beyond standard internships."
+Rating 7: "Early employee at design tool startup (#8, through Series B), now founding similar company (6 months in). Clear builder trajectory but early stage."
+
+Rating 7: "First sales hire at B2B SaaS (grew team 1→10, $0→$5M ARR over 3 years). Strong university. Currently employed but good GTM + hustle signal."
+
+Rating 6: "Mid-level PM at tech company (3 years) across multiple product areas. Solid tenure but no clear domain spike or standout signal."
+
+Rating 5: "Junior engineer at established company (18 months), good university. Decent foundation but nothing exceptional yet - needs more time."
+
+Rating 4: "Recent grad with 1 year at consulting firm. No startup exposure, no building evidence, standard path with no wildcards."
+
+Rating 3: "15 years in corporate IT roles, no product building. Wrong profile for founding - more suited to enterprise operations."
+
+Rating 2: "Currently CEO of same company for 4 years. Not available for incubation."
+
+Rating 1: "Pure sales background with no product/technical exposure, no top university, no startup experience. Not relevant for technical founding."
 
 **Remember:**
 - Cite verifiable facts (company type, role level, years)
