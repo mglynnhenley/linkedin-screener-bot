@@ -281,6 +281,7 @@ Rating 1: "Enterprise sales at large corporations (10 years), no startup exposur
 
 **Remember:**
 - Technical and non-technical are EQUALLY valuable if startup experience is strong
+- If they have just graduated from university, they are not a good candidate for incubation unless show extreme outlier trates
 - Cite verifiable facts (company type, role level, years)
 - Focus on patterns not brand names: "senior at fintech scale-up" > "senior at Stripe"
 - Explain what makes them interesting for incubation
