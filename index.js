@@ -114,7 +114,7 @@ async function callRelevanceAPI(profileUrls) {
     throw new Error('profileUrls must be a non-empty array');
   }
 
-  const batches = chunkArray(profileUrls, 50);
+  const batches = chunkArray(profileUrls, 20);
   const combinedProfiles = [];
 
   for (let idx = 0; idx < batches.length; idx++) {
