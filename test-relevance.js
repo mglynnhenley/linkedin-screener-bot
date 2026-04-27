@@ -18,7 +18,10 @@ async function testRelevanceAPI() {
     
     const response = await fetch(process.env.RELEVANCE_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.RELEVANCE_API_KEY,
+      },
       body: JSON.stringify({ profile_urls: testUrls }),
     });
     

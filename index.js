@@ -107,6 +107,9 @@ async function callRelevanceAPI(profileUrls) {
   if (!process.env.RELEVANCE_API_URL) {
     throw new Error('RELEVANCE_API_URL environment variable is not set');
   }
+  if (!process.env.RELEVANCE_API_KEY) {
+    throw new Error('RELEVANCE_API_KEY environment variable is not set');
+  }
   if (!Array.isArray(profileUrls) || profileUrls.length === 0) {
     throw new Error('profileUrls must be a non-empty array');
   }
@@ -121,7 +124,10 @@ async function callRelevanceAPI(profileUrls) {
 
     const response = await fetch(process.env.RELEVANCE_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': process.env.RELEVANCE_API_KEY,
+      },
       body: JSON.stringify({ profile_urls: batch }),
     });
 
